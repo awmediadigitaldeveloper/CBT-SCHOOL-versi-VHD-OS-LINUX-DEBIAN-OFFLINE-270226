@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
   <head>
@@ -10,6 +9,16 @@
     <title>CBT ENTERPRISE 2026 - VERIFIED</title>
     <meta name="title" content="CBT School Application">
     <meta name="description" content="Sistem Ujian Sekolah Terintegrasi Berbasis Komputer & Smartphone. Aman, Cepat, dan Terpercaya." />
+
+    <!-- ============================================================
+         CATATAN: File ini adalah versi ROLLBACK / SEMENTARA
+         Tailwind & library masih via CDN agar tampilan normal dulu.
+         
+         Untuk versi OFFLINE FINAL, jalankan dulu:
+           npm install
+           npm run build
+         Lalu ganti dengan index.html dari cbt-fixed-files.zip
+         ============================================================ -->
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,7 +32,6 @@
       body {
         font-family: 'Inter', sans-serif;
       }
-      /* Font Times New Roman like for Documents */
       .font-serif-print {
         font-family: 'Tinos', 'Times New Roman', Times, serif;
       }
@@ -43,44 +51,31 @@
         animation: scale-up 0.2s ease-out forwards;
       }
       @keyframes slide-in-right {
-        from {
-          transform: translateX(100%);
-          opacity: 0;
-        }
-        to {
-          transform: translateX(0);
-          opacity: 1;
-        }
+        from { transform: translateX(100%); opacity: 0; }
+        to   { transform: translateX(0);    opacity: 1; }
       }
       .animate-slide-in-right {
         animation: slide-in-right 0.4s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
       }
       
-      /* --- ENTERPRISE PRINT FIXES (WYSIWYG) --- */
       @media print {
         @page {
-          margin: 0 !important; /* Hilangkan margin browser default */
+          margin: 0 !important;
           size: auto;
         }
-        
         html, body {
           width: 100%;
           height: 100%;
           margin: 0 !important;
           padding: 0 !important;
           background-color: white !important;
-          /* CRITICAL: Force background colors & images to print */
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
           color-adjust: exact !important;
         }
-
-        /* Sembunyikan semua elemen aplikasi utama secara default */
         body > *:not(.print-container-root) {
           display: none !important;
         }
-
-        /* Kelas khusus untuk wrapper konten yang akan dicetak */
         .print-container-root {
           display: block !important;
           position: absolute !important;
@@ -91,23 +86,16 @@
           z-index: 9999 !important;
           background-color: white !important;
         }
-        
         .print-container-root * {
           visibility: visible !important;
         }
-
-        /* Hilangkan elemen utility saat cetak */
         .no-print, header, aside, footer, nav, button, .admin-sidebar {
           display: none !important;
         }
-        
-        /* Force Page Breaks */
         .page-break {
           page-break-before: always !important;
           break-before: page !important;
         }
-        
-        /* Hindari pemotongan di dalam tabel/baris */
         tr, td, th, .card-item {
           page-break-inside: avoid !important;
           break-inside: avoid !important;
@@ -115,38 +103,25 @@
       }
       
       @keyframes progress {
-        0% { width: 0%; left: 0%; }
-        50% { width: 50%; left: 25%; }
+        0%   { width: 0%;   left: 0%;   }
+        50%  { width: 50%;  left: 25%;  }
         100% { width: 100%; left: 100%; }
       }
       .animate-progress {
         position: absolute;
         animation: progress 2s ease-in-out infinite;
       }
-      
       .font-handwriting { font-family: 'Courier New', Courier, monospace; }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "uuid": "https://aistudiocdn.com/uuid@^13.0.0",
-    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.45.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1",
-    "path": "https://aistudiocdn.com/path@^0.12.7",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
-    "vite": "https://aistudiocdn.com/vite@^7.2.4",
-    "firebase/": "https://esm.sh/firebase@^12.9.0/",
-    "exceljs": "https://esm.sh/exceljs@^4.4.0",
-    "docx": "https://esm.sh/docx@^9.5.3",
-    "mammoth": "https://esm.sh/mammoth@^1.11.0"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
+
+    <!-- ============================================================
+         PENTING: ImportMap DIHAPUS dari sini.
+         ImportMap dari aistudiocdn.com konflik dengan Vite bundler
+         dan menyebabkan React double-instance error.
+         Semua module sudah di-handle oleh Vite via npm.
+         ============================================================ -->
+
+  </head>
   <body class="bg-gray-50">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

@@ -1,0 +1,34 @@
+/* ==============================================================================
+   CBT SCHOOL ENTERPRISE — Global CSS
+   Tailwind CSS via PostCSS (tidak butuh CDN)
+   ============================================================================== */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom base styles */
+@layer base {
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                 Roboto, Oxygen, Ubuntu, sans-serif;
+  }
+
+  /* Prevent text selection saat ujian berlangsung (anti-cheat) */
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+  }
+}
+
+@layer utilities {
+  /* Font untuk dokumen cetak */
+  .font-serif-print {
+    font-family: 'Times New Roman', Times, serif;
+  }
+
+  .font-handwriting {
+    font-family: 'Courier New', Courier, monospace;
+  }
+}

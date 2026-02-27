@@ -2,23 +2,36 @@ import axios from 'axios';
 import semver from 'semver';
 import { version as currentVersion } from '../../package.json';
 
-// --- CONFIGURATION ---
-const SUPABASE_URL = 'https://yiuamqcfgdgcwxtrihfd.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpdWFtcWNmZ2RnY3d4dHJpaGZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NTU5MDUsImV4cCI6MjA4MTQzMTkwNX0.tRUkfK3cx2Cpwqv14ZXYoUpwwpi_hDhl90EfARAA_IA';
-const APP_ID = 'cbt_pro';
+// ==============================================================================
+//  UPDATER SERVICE — CBT SCHOOL ENTERPRISE VHD EDITION
+//
+//  Fungsi:
+//  - Cek versi terbaru dari vendor (butuh internet via NAT)
+//  - Tampilkan notifikasi ke admin jika ada update
+//  - Download & apply update (hanya di Node.js/server environment)
+//
+//  Catatan VHD:
+//  - checkUpdate() aman dipanggil di browser (ada guard navigator.onLine)
+//  - performUpdate() hanya untuk server-side / Electron, tidak bisa di browser
+// ==============================================================================
+
+const VENDOR_SUPABASE_URL = 'https://yiuamqcfgdgcwxtrihfd.supabase.co';
+const VENDOR_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpdWFtcWNmZ2RnY3d4dHJpaGZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NTU5MDUsImV4cCI6MjA4MTQzMTkwNX0.tRUkfK3cx2Cpwqv14ZXYoUpwwpi_hDhl90EfARAA_IA';
+const APP_ID              = 'cbt_pro';
+const CHECK_TIMEOUT_MS    = 5000;
 
 export interface UpdateInfo {
-  id: string;
-  version: string;
-  download_url: string;
+  id:             string;
+  version:        string;
+  download_url:   string;
   release_notes?: string;
   sql_migration?: string;
-  created_at: string;
+  created_at:     string;
 }
 
 class UpdaterService {
   private static instance: UpdaterService;
-  
+
   private constructor() {}
 
   public static getInstance(): UpdaterService {
@@ -29,102 +42,151 @@ class UpdaterService {
   }
 
   /**
-   * Check for available updates from Supabase Vendor
+   * Cek apakah ada versi terbaru dari vendor.
+   *
+   * Guard: Hanya berjalan jika navigator.onLine === true.
+   * Aman dipanggil di browser — tidak akan hang atau throw jika offline.
+   *
+   * @returns UpdateInfo jika ada versi baru, null jika sudah up-to-date atau offline/error.
    */
   public async checkUpdate(): Promise<UpdateInfo | null> {
+    // === GUARD: Jangan cek update jika offline ===
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      console.log('[Updater] Offline — skip cek update.');
+      return null;
+    }
+
     try {
-      console.log(`[Updater] Checking for updates... Current version: ${currentVersion}`);
-      
-      // Query Supabase via REST API (using axios to avoid another supabase client instance)
-      const response = await axios.get(`${SUPABASE_URL}/rest/v1/app_versions`, {
+      console.log(`[Updater] Cek update... Versi saat ini: ${currentVersion}`);
+
+      const controller = new AbortController();
+      const timeoutId  = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
+
+      const response = await axios.get(`${VENDOR_SUPABASE_URL}/rest/v1/app_versions`, {
         params: {
           application_id: `eq.${APP_ID}`,
-          is_active: `eq.true`,
-          select: '*',
-          order: 'created_at.desc',
-          limit: 1
+          is_active:       'eq.true',
+          select:          '*',
+          order:           'created_at.desc',
+          limit:            1,
         },
         headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+          'apikey':        VENDOR_SUPABASE_KEY,
+          'Authorization': `Bearer ${VENDOR_SUPABASE_KEY}`,
+        },
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (response.data && response.data.length > 0) {
-        const latestUpdate = response.data[0] as UpdateInfo;
-        
-        // Compare versions using semver
-        if (semver.gt(latestUpdate.version, currentVersion)) {
-          console.log(`[Updater] New version found: ${latestUpdate.version}`);
-          return latestUpdate;
+        const latest = response.data[0] as UpdateInfo;
+
+        if (semver.gt(latest.version, currentVersion)) {
+          console.log(`[Updater] Versi baru ditemukan: ${latest.version}`);
+          return latest;
         } else {
-          console.log(`[Updater] App is up to date.`);
+          console.log(`[Updater] Aplikasi sudah versi terbaru (${currentVersion}).`);
         }
       }
-      
+
       return null;
-    } catch (error) {
-      console.error('[Updater] Failed to check for updates:', error);
+
+    } catch (err: any) {
+      if (err.code === 'ERR_CANCELED' || err.message?.includes('abort')) {
+        console.warn('[Updater] Cek update timeout. Koneksi lambat atau tidak tersedia.');
+      } else if (err.message?.includes('Network') || err.message?.includes('fetch')) {
+        console.warn('[Updater] Tidak ada koneksi internet untuk cek update.');
+      } else {
+        console.error('[Updater] Gagal cek update:', err.message);
+      }
       return null;
     }
   }
 
   /**
-   * Perform the update process (Download -> Extract -> Replace)
-   * NOTE: This function requires a Node.js environment (Electron/Server).
-   * It will throw an error if run in a browser.
+   * Lakukan proses update (download, extract, replace files).
+   *
+   * ⚠️ PENTING: Fungsi ini HANYA bisa dijalankan di lingkungan Node.js
+   * (Electron, server script), TIDAK di browser.
+   *
+   * Untuk VHD, update dilakukan oleh admin IT dengan cara:
+   * 1. Download ZIP update dari link yang diberikan vendor
+   * 2. Extract ke /opt/cbt-enterprise/frontend/
+   * 3. Jalankan npm run build ulang
+   * 4. Restart nginx
+   *
+   * Fungsi ini tetap ada untuk keperluan masa depan jika ada
+   * admin panel berbasis Electron atau script Node.js.
    */
-  public async performUpdate(updateInfo: UpdateInfo, onProgress?: (percent: number) => void): Promise<boolean> {
-    // Check environment
-    if (typeof window !== 'undefined' && !window.process?.versions?.node) {
-      console.error('[Updater] performUpdate cannot run in a browser environment. It requires Node.js access (e.g. Electron).');
-      throw new Error('Update otomatis hanya tersedia di aplikasi Desktop/Server (Node.js).');
+  public async performUpdate(
+    updateInfo: UpdateInfo,
+    onProgress?: (percent: number) => void
+  ): Promise<boolean> {
+
+    // Guard: Tidak bisa dijalankan di browser
+    const isBrowser = typeof window !== 'undefined' &&
+                      !(window as any).process?.versions?.node;
+
+    if (isBrowser) {
+      console.warn('[Updater] performUpdate() tidak dapat dijalankan di browser.');
+      console.info('[Updater] Untuk update di VHD, ikuti langkah manual:');
+      console.info('  1. Download ZIP dari:', updateInfo.download_url);
+      console.info('  2. Extract ke server VHD');
+      console.info('  3. Jalankan: npm run build');
+      console.info('  4. Copy dist/ ke /opt/cbt-enterprise/frontend/dist/');
+      console.info('  5. Reload nginx: sudo systemctl reload nginx');
+      throw new Error(
+        'Update otomatis hanya tersedia via script server atau Electron.\n' +
+        'Silakan minta admin IT untuk melakukan update manual.'
+      );
+    }
+
+    // Guard: Butuh internet untuk download
+    if (!navigator.onLine) {
+      throw new Error('Update membutuhkan koneksi internet.');
     }
 
     try {
-      console.log(`[Updater] Starting update to version ${updateInfo.version}...`);
-      
-      // Dynamic imports for Node.js modules to prevent browser build errors
-      const fs = await import('fs');
-      const path = await import('path');
-      const AdmZip = (await import('adm-zip')).default;
-      
+      console.log(`[Updater] Memulai update ke versi ${updateInfo.version}...`);
+
+      // Dynamic import Node.js modules (agar tidak crash saat bundle browser)
+      const fs      = await import('fs');
+      const path    = await import('path');
+      const AdmZip  = (await import('adm-zip')).default;
+
       const tempDir = path.resolve('./temp_update');
       const zipPath = path.join(tempDir, 'update.zip');
 
-      // 1. Create temp directory
+      // 1. Buat direktori temp
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
       }
 
-      // 2. Download the update file
-      console.log(`[Updater] Downloading ${updateInfo.download_url}...`);
+      // 2. Download ZIP
+      console.log(`[Updater] Mengunduh dari ${updateInfo.download_url}...`);
       const response = await axios({
-        url: updateInfo.download_url,
-        method: 'GET',
+        url:          updateInfo.download_url,
+        method:       'GET',
         responseType: 'arraybuffer',
-        onDownloadProgress: (progressEvent) => {
-          if (onProgress && progressEvent.total) {
-            const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            onProgress(percent);
+        onDownloadProgress: (e) => {
+          if (onProgress && e.total) {
+            onProgress(Math.round((e.loaded * 100) / e.total));
           }
-        }
+        },
       });
 
-      // 3. Save zip file
       fs.writeFileSync(zipPath, Buffer.from(response.data));
-      console.log('[Updater] Download complete.');
+      console.log('[Updater] Download selesai.');
 
-      // 4. Extract
-      console.log('[Updater] Extracting...');
+      // 3. Extract
       const zip = new AdmZip(zipPath);
       zip.extractAllTo(tempDir, true);
 
-      // 5. Backup critical files (e.g., .env)
+      // 4. Backup file kritis
       const backupDir = path.resolve('./backup_before_update');
       if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir);
-      
-      const criticalFiles = ['.env', 'metadata.json', 'supabaseClient.ts'];
+      const criticalFiles = ['.env', 'metadata.json'];
       criticalFiles.forEach(file => {
         const src = path.resolve(file);
         if (fs.existsSync(src)) {
@@ -132,77 +194,38 @@ class UpdaterService {
         }
       });
 
-      // 6. Replace project files
-      console.log('[Updater] Replacing files...');
-      const items = fs.readdirSync(tempDir);
-      
+      // 5. Replace files (skip file yang dilindungi)
+      const protectedItems = ['.env', '.gitignore', 'node_modules', '.git'];
+      const items          = fs.readdirSync(tempDir);
+
       for (const item of items) {
-        if (item === 'update.zip') continue;
-        
-        const srcPath = path.join(tempDir, item);
-        const destPath = path.resolve('./', item);
-        
-        // Skip critical files/folders that shouldn't be overwritten
-        if (['.env', '.gitignore', 'node_modules', '.git'].includes(item)) {
-          console.log(`[Updater] Skipping protected item: ${item}`);
+        if (item === 'update.zip' || protectedItems.includes(item)) {
+          console.log(`[Updater] Skip: ${item}`);
           continue;
         }
+        const srcPath  = path.join(tempDir, item);
+        const destPath = path.resolve('./', item);
 
-        // Recursive copy
         if (fs.statSync(srcPath).isDirectory()) {
-             fs.cpSync(srcPath, destPath, { recursive: true, force: true });
+          fs.cpSync(srcPath, destPath, { recursive: true, force: true });
         } else {
-             fs.copyFileSync(srcPath, destPath);
-        }
-      }
-      
-      // 7. Execute SQL Migration if any
-      if (updateInfo.sql_migration) {
-        console.log('[Updater] Found SQL migration. Attempting to execute...');
-        try {
-            // Read .env to get local DB credentials
-            const envPath = path.resolve('.env');
-            if (fs.existsSync(envPath)) {
-                const envContent = fs.readFileSync(envPath, 'utf-8');
-                const envConfig: Record<string, string> = {};
-                envContent.split('\n').forEach(line => {
-                    const [key, value] = line.split('=');
-                    if (key && value) envConfig[key.trim()] = value.trim();
-                });
-
-                // We need a way to execute raw SQL. 
-                // Since we don't have 'pg' installed, we'll try to use the supabase client if available in the environment
-                // or just log the migration for manual execution.
-                
-                console.log('[Updater] SQL Migration Content:', updateInfo.sql_migration);
-                console.log('[Updater] NOTE: Automatic SQL execution requires "pg" library or a Supabase Admin client.');
-                console.log('[Updater] Please execute the migration manually if needed.');
-                
-                // FUTURE: Install 'pg' and use:
-                // const { Client } = require('pg');
-                // const client = new Client({ connectionString: envConfig.DATABASE_URL });
-                // await client.connect();
-                // await client.query(updateInfo.sql_migration);
-                // await client.end();
-            }
-        } catch (err) {
-            console.error('[Updater] Failed to process SQL migration:', err);
+          fs.copyFileSync(srcPath, destPath);
         }
       }
 
-      // 8. Cleanup
+      // 6. Cleanup
       try {
         fs.rmSync(tempDir, { recursive: true, force: true });
       } catch (e) {
-        console.warn('[Updater] Failed to clean up temp dir:', e);
+        console.warn('[Updater] Gagal bersihkan temp dir:', e);
       }
 
-      console.log('[Updater] Update completed successfully.');
+      console.log(`[Updater] Update ke ${updateInfo.version} selesai.`);
       return true;
 
-    } catch (error) {
-      console.error('[Updater] Update failed:', error);
-      throw error;
+    } catch (err) {
+      console.error('[Updater] Update gagal:', err);
+      throw err;
     }
   }
 }
