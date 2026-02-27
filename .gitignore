@@ -1,3 +1,27 @@
+# ==============================================================================
+#  CBT SCHOOL ENTERPRISE — .gitignore
+# ==============================================================================
+
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build output
+dist
+dist-ssr
+
+# ============================================================
+# ENVIRONMENT FILES — JANGAN PERNAH DI-COMMIT KE GITHUB!
+# File ini berisi credentials database, API keys, passwords.
+# ============================================================
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+*.local
+
 # Logs
 logs
 *.log
@@ -6,11 +30,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +41,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Temp files
+temp_update/
+backup_before_update/
+*.tmp
+*.bak

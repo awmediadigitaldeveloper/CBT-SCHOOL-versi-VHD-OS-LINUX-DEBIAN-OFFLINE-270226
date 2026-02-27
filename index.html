@@ -10,30 +10,28 @@
     <meta name="title" content="CBT School Application">
     <meta name="description" content="Sistem Ujian Sekolah Terintegrasi Berbasis Komputer & Smartphone. Aman, Cepat, dan Terpercaya." />
 
-    <!-- ============================================================
-         CATATAN: File ini adalah versi ROLLBACK / SEMENTARA
-         Tailwind & library masih via CDN agar tampilan normal dulu.
-         
-         Untuk versi OFFLINE FINAL, jalankan dulu:
-           npm install
-           npm run build
-         Lalu ganti dengan index.html dari cbt-fixed-files.zip
-         ============================================================ -->
+    <!--
+      ============================================================
+      VHD OFFLINE EDITION — ZERO CDN
+      
+      Semua library sudah di-bundle oleh Vite (npm):
+      ✅ Tailwind CSS    → via PostCSS (index.css)
+      ✅ html5-qrcode    → via npm import di QRScannerModal.tsx
+      ✅ html2pdf.js     → via npm import di ExamCards & PrintDocuments
+      ✅ React           → via npm
+      ✅ Supabase        → via npm
+      
+      Tidak ada CDN external = 100% offline setelah build
+      ============================================================
+    -->
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Pacifico&family=Tinos:wght@400;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <!-- HTML2PDF for Precision PDF Export -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    
     <style>
       body {
-        font-family: 'Inter', sans-serif;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont,
+                     'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
       }
       .font-serif-print {
-        font-family: 'Tinos', 'Times New Roman', Times, serif;
+        font-family: 'Times New Roman', Times, serif;
       }
       
       @keyframes fade-in {
@@ -113,14 +111,6 @@
       }
       .font-handwriting { font-family: 'Courier New', Courier, monospace; }
     </style>
-
-    <!-- ============================================================
-         PENTING: ImportMap DIHAPUS dari sini.
-         ImportMap dari aistudiocdn.com konflik dengan Vite bundler
-         dan menyebabkan React double-instance error.
-         Semua module sudah di-handle oleh Vite via npm.
-         ============================================================ -->
-
   </head>
   <body class="bg-gray-50">
     <div id="root"></div>

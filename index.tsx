@@ -1,3 +1,4 @@
+import './index.css'; // ← WAJIB: Load Tailwind CSS via PostCSS (bukan CDN)
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
